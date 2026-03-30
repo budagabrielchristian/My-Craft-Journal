@@ -200,6 +200,7 @@ body.weather-snow #weather-overlay {
     margin: 0;
     overflow-y: auto;
     flex-grow: 1;
+    min-height: 0; /* NEW: The magic rule that forces internal scrolling! */
 }
 
 .entry-item {
@@ -724,13 +725,16 @@ body.zen-mode #sparks-container {
     }
 
     #sidebar {
-        position: fixed;
-        left: -100%; 
-        top: 0;
-        height: 100%;
-        z-index: 1000;
-        transition: left 0.3s ease;
-        box-shadow: 5px 0 15px rgba(0,0,0,0.8);
+        width: 230px; 
+        background-color: rgba(0, 0, 0, 0.7);
+        border-right: 4px solid var(--border-dark);
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        box-sizing: border-box;
+        color: white;
+        height: 100dvh; /* NEW: Locks the sidebar to exactly the screen height */
+        max-height: 100dvh; /* NEW: Prevents it from ever stretching */
     }
 
     #sidebar.open { left: 0; }
