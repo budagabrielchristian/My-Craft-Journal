@@ -1,4 +1,3 @@
-// DOM Elements
 const listEl = document.getElementById('entry-list');
 const newBtn = document.getElementById('new-btn');
 const titleInput = document.getElementById('title-input');
@@ -10,11 +9,9 @@ const searchInput = document.getElementById('search-input');
 const xpFill = document.getElementById('xp-bar-fill');
 const xpLevel = document.getElementById('xp-level');
 
-// === Custom Toolbar Icons (Enchantment) ===
 const icons = Quill.import('ui/icons');
 icons['code'] = '<span style="font-family: SGA; font-size: 1.2rem;">E</span>';
 
-// Initialize Quill Rich Text Editor
 const quill = new Quill('#quill-editor', {
     theme: 'snow',
     modules: {
@@ -27,12 +24,13 @@ const quill = new Quill('#quill-editor', {
     }
 });
 
-// State
-let entries = JSON.parse(localStorage.getItem('mcJournals')) || [];
+let entries = [];
+try { entries = JSON.parse(localStorage.getItem('mcJournals')) || []; } 
+catch (e) { entries = []; }
+
 let currentId = null;
 let saveTimeout;
 
-// Audio System 
 const clickSound = new Audio('sounds/click.mp3');
 const pageSound = new Audio('sounds/page.mp3');
 const levelUpSound = new Audio('sounds/levelup.mp3');
@@ -42,8 +40,34 @@ function playSound(sound) {
     sound.play().catch(e => console.log("Sound skipped"));
 }
 
-// Boot up
+// === NEW: Permanent Advancements System ===
+let unlockedAdvs = JSON.parse(localStorage.getItem('mcAdvs')) || [];
+
+function unlockAdvancement(id, title) {
+    if (!unlockedAdvs.includes(id)) {
+        unlockedAdvs.push(id);
+        localStorage.setItem('mcAdvs', JSON.stringify(unlockedAdvs));
+        showAdvancement(title);
+        updateAdvancementsUI();
+    }
+}
+
+function updateAdvancementsUI() {
+    document.querySelectorAll('.adv-node').forEach(node => {
+        if (unlockedAdvs.includes(node.id)) {
+            node.classList.remove('locked');
+            node.classList.add('unlocked');
+            const img = node.querySelector('img');
+            if(img) { 
+                img.style.filter = 'grayscale(0%)'; 
+                img.style.opacity = '1'; 
+            }
+        }
+    });
+}
+
 function init() {
+    updateAdvancementsUI(); // Load saved advancements visually
     renderList();
     if (entries.length > 0) {
         loadEntry(entries[0].id);
@@ -52,60 +76,38 @@ function init() {
     }
 }
 
-// Render the sidebar list with Search & Delete X
+// === UPDATE: Row-Based Inventory rendering ===
 function renderList(searchTerm = "") {
     listEl.innerHTML = '';
     
     const filteredEntries = entries.filter(e => {
+        if (!e) return false; 
         const title = (e.title || "Untitled Book").toLowerCase();
         return title.includes(searchTerm.toLowerCase());
     });
 
-    filteredEntries.sort((a, b) => b.date - a.date).forEach(entry => {
-        const li = document.createElement('li');
-        li.className = `entry-item ${entry.id === currentId ? 'active' : ''}`;
+    filteredEntries.sort((a, b) => (b.date || 0) - (a.date || 0)).forEach(entry => {
+        const slot = document.createElement('div');
+        slot.className = `inv-slot ${entry.id === currentId ? 'active' : ''}`;
         
-        const titleSpan = document.createElement('span');
-        titleSpan.className = 'entry-text';
-        titleSpan.textContent = entry.title || "Untitled Book";
-        
-        const deleteSpan = document.createElement('span');
-        deleteSpan.className = 'delete-x';
-        deleteSpan.title = 'Drop Book';
-        deleteSpan.textContent = 'X';
-        
-        deleteSpan.onclick = (e) => {
-            e.stopPropagation(); 
-            playSound(clickSound);
-            if (confirm("Are you sure you want to drop this book into the lava? This cannot be undone!")) {
-                entries = entries.filter(e => e.id !== entry.id);
-                localStorage.setItem('mcJournals', JSON.stringify(entries));
-                
-                if (currentId === entry.id) {
-                    searchInput.value = ''; 
-                    if (entries.length > 0) {
-                        loadEntry(entries[0].id);
-                    } else {
-                        createNewEntry();
-                    }
-                } else {
-                    renderList(searchInput.value); 
-                }
-            }
-        };
+        const icon = document.createElement('img');
+        icon.src = 'favicon-32x32.png'; 
+        slot.appendChild(icon);
 
-        li.onclick = () => {
+        const titleText = document.createElement('span');
+        titleText.className = 'inv-title-text';
+        titleText.innerText = entry.title || "Untitled Book";
+        slot.appendChild(titleText);
+
+        slot.onclick = () => {
             playSound(clickSound);
             loadEntry(entry.id);
-            // NEW: Close the mobile menu if it's currently open
             if (sidebar.classList.contains('open')) {
                 toggleMobileMenu();
             }
         };
         
-        li.appendChild(titleSpan);
-        li.appendChild(deleteSpan);
-        listEl.appendChild(li);
+        listEl.appendChild(slot);
     });
 }
 
@@ -115,24 +117,22 @@ function triggerAnimation() {
     bookGui.classList.add('book-animate');
 }
 
-// Load an entry
 function loadEntry(id) {
-    const entry = entries.find(e => e.id === id);
+    const entry = entries.find(e => e && e.id === id);
     if (entry) {
         if (currentId !== id) {
             triggerAnimation();
             playSound(pageSound);
         }
         currentId = id;
-        titleInput.value = entry.title;
-        quill.root.innerHTML = entry.content; 
+        titleInput.value = entry.title || "";
+        quill.root.innerHTML = entry.content || ""; 
         saveStatus.innerText = "Loaded";
         applyDimension(entry.dimension || 'overworld');
         renderList(searchInput.value);
     }
 }
 
-// Create a new entry
 function createNewEntry() {
     playSound(pageSound);
     const newEntry = {
@@ -145,9 +145,31 @@ function createNewEntry() {
     entries.push(newEntry);
     loadEntry(newEntry.id);
     titleInput.focus();
+    
+    // Check Achievement
+    unlockAdvancement('adv-authors', "Author's Journey");
 }
 
-// Auto-save function & XP Bar Calculator
+// === NEW: Delete Button Logic ===
+const deleteBtn = document.getElementById('delete-btn');
+deleteBtn.addEventListener('click', () => {
+    // Standard browser confirmation popup before deleting!
+    if(confirm("Are you sure you want to throw this book in the lava? This cannot be undone!")) {
+        playSound(clickSound);
+        // Filter out the current book
+        entries = entries.filter(e => e.id !== currentId);
+        // Save the new list
+        localStorage.setItem('mcJournals', JSON.stringify(entries));
+        
+        // Load the next book, or create a new one if empty
+        if(entries.length > 0) {
+            loadEntry(entries[0].id);
+        } else {
+            createNewEntry();
+        }
+    }
+});
+
 function triggerSave() {
     saveStatus.innerText = "Saving...";
     clearTimeout(saveTimeout);
@@ -163,17 +185,28 @@ function triggerSave() {
             checkStreak(); 
         }
 
-        const text = quill.getText().trim(); 
-        const wordCount = text.length > 0 ? text.split(/\s+/).length : 0;
+        // Count words for XP and 10k Achievement
+        let totalWordsAllBooks = 0;
+        entries.forEach(e => {
+            // Strip HTML to get real text
+            const textOnly = e.content.replace(/<[^>]*>?/gm, '');
+            const count = textOnly.trim().length > 0 ? textOnly.trim().split(/\s+/).length : 0;
+            totalWordsAllBooks += count;
+        });
         
-        xpLevel.innerText = wordCount; 
-        const progress = (wordCount % 50) / 50 * 100; 
+        const currentText = quill.getText().trim();
+        const currentWordCount = currentText.length > 0 ? currentText.split(/\s+/).length : 0;
+        
+        xpLevel.innerText = currentWordCount; 
+        const progress = (currentWordCount % 50) / 50 * 100; 
         xpFill.style.width = `${progress}%`;
+        
+        // Achievement Check
+        if(totalWordsAllBooks >= 10000) unlockAdvancement('adv-10k', 'Librarian');
 
     }, 500);
 }
 
-// === Export / Import ===
 function exportData() {
     playSound(clickSound);
     const dataStr = JSON.stringify(entries);
@@ -183,6 +216,9 @@ function exportData() {
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
+    
+    // Achievement Check
+    unlockAdvancement('adv-storage', 'Safe Storage');
 }
 
 function importData(event) {
@@ -199,18 +235,13 @@ function importData(event) {
                 playSound(pageSound);
                 init();
                 alert("Journal successfully restored from chest!");
-            } else {
-                alert("Invalid backup file format.");
-            }
-        } catch (error) {
-            alert("Error reading backup file.");
-        }
+            } else { alert("Invalid backup file format."); }
+        } catch (error) { alert("Error reading backup file."); }
     };
     reader.readAsText(file);
     event.target.value = ''; 
 }
 
-// Check Streak Advancement
 function checkStreak() {
     if (entries.length === 0) return;
 
@@ -233,9 +264,7 @@ function checkStreak() {
         } else if (i === 0 && Math.abs(new Date() - writeDate) < 172800000) {
             checkDate.setDate(checkDate.getDate() - 1);
             i--; 
-        } else {
-            break; 
-        }
+        } else { break; }
     }
 
     const milestones = [3, 7, 14, 30, 64, 100]; 
@@ -257,7 +286,6 @@ function showAdvancement(message) {
     setTimeout(() => { toast.classList.remove('show'); }, 6000);
 }
 
-// === Dimension & Weather Logic ===
 const dimBtns = document.querySelectorAll('.dim-btn');
 const zenBtn = document.getElementById('zen-btn');
 let isZenMode = false;
@@ -275,8 +303,7 @@ dimBtns.forEach(btn => {
     });
 });
 
-// === Dimension & Dynamic Weather Logic ===
-let weatherTimer; // NEW: A variable to hold our weather clock
+let weatherTimer; 
 
 function applyDimension(dim) {
     dimBtns.forEach(b => b.classList.remove('active'));
@@ -286,55 +313,54 @@ function applyDimension(dim) {
     document.body.classList.remove('weather-rain', 'weather-snow');
     if (rainAudio) rainAudio.pause(); 
     
-    // Stop the weather clock if we change dimensions
     clearInterval(weatherTimer); 
     
     if (dim !== 'overworld') {
         document.body.classList.add(`theme-${dim}`);
+        
+        // Check Achievements
+        if(dim === 'nether') unlockAdvancement('adv-nether', 'We Need to Go Deeper');
+        if(dim === 'end') unlockAdvancement('adv-end', 'The End?');
+        
     } else if (!isZenMode) {
-        // Roll the weather immediately, then check again every 3 minutes
         rollWeather(); 
-        weatherTimer = setInterval(rollWeather, 180000); // 180,000ms = 3 minutes
+        checkTimeOfDay(); 
+        weatherTimer = setInterval(() => { rollWeather(); checkTimeOfDay(); }, 180000); 
     }
     
     if (isZenMode) document.body.classList.add('zen-mode');
-    
-    if (typeof updateMusicDimension === 'function') {
-        updateMusicDimension(dim);
+    if (typeof updateMusicDimension === 'function') updateMusicDimension(dim);
+}
+
+function checkTimeOfDay() {
+    const hour = new Date().getHours();
+    document.body.classList.remove('time-sunset', 'time-night');
+    if (document.querySelector('.dim-btn.active').dataset.dim === 'overworld' && !isZenMode) {
+        if (hour >= 18 && hour < 20) { document.body.classList.add('time-sunset'); } 
+        else if (hour >= 20 || hour < 6) { document.body.classList.add('time-night'); }
     }
 }
 
-// NEW: The function that actually changes the weather
 function rollWeather() {
-    // Clear out the old weather first
     document.body.classList.remove('weather-rain', 'weather-snow');
-    
     const chance = Math.random(); 
     if (chance < 0.25) { 
-        // 25% Chance of Rain
         document.body.classList.add('weather-rain');
         if (isMusicPlaying) rainAudio.play().catch(e => console.log("Rain blocked"));
     } 
     else if (chance < 0.50) { 
-        // 25% Chance of Snow
         document.body.classList.add('weather-snow');
-        if (rainAudio) rainAudio.pause(); // Snow is quiet!
+        if (rainAudio) rainAudio.pause(); 
     } else {
-        // 50% Chance of Sunny/Clear
         if (rainAudio) rainAudio.pause();
     }
 }
 
-// === Jukebox & Music Logic ===
 const playPauseBtn = document.getElementById('play-pause-btn');
 const volumeSlider = document.getElementById('volume-slider');
 const nowPlayingText = document.getElementById('now-playing');
 
-const musicTracks = {
-    overworld: new Audio('sounds/music-ow.mp3'),
-    nether: new Audio('sounds/music-nt.mp3'),
-    end: new Audio('sounds/music-en.mp3')
-};
+const musicTracks = { overworld: new Audio('sounds/music-ow.mp3'), nether: new Audio('sounds/music-nt.mp3'), end: new Audio('sounds/music-en.mp3') };
 const rainAudio = new Audio('sounds/rain.mp3');
 rainAudio.loop = true;
 
@@ -346,16 +372,13 @@ let isMusicPlaying = false;
 playPauseBtn.addEventListener('click', () => {
     playSound(clickSound);
     isMusicPlaying = !isMusicPlaying;
-    
     const activeDim = document.querySelector('.dim-btn.active').dataset.dim || 'overworld';
     
     if (isMusicPlaying) {
         playPauseBtn.innerText = "⏸ Pause Music";
         currentMusic.volume = volumeSlider.value;
         currentMusic.play().catch(e => console.log("Music play blocked"));
-        
         if (document.body.classList.contains('weather-rain')) rainAudio.play();
-        
         nowPlayingText.innerText = `Playing: ${activeDim.charAt(0).toUpperCase() + activeDim.slice(1)}`;
     } else {
         playPauseBtn.innerText = "🎵 Play Music";
@@ -375,7 +398,6 @@ function updateMusicDimension(dim) {
         if (isMusicPlaying) currentMusic.pause(); 
         currentMusic = musicTracks[dim]; 
         currentMusic.volume = volumeSlider.value;
-        
         if (isMusicPlaying) {
             currentMusic.play().catch(e => console.log("Music switch blocked"));
             nowPlayingText.innerText = `Playing: ${dim.charAt(0).toUpperCase() + dim.slice(1)}`;
@@ -383,29 +405,8 @@ function updateMusicDimension(dim) {
     }
 }
 
-// === YouTube API Setup (For Campfire Mode) ===
-let ytPlayer;
-const tag = document.createElement('script');
-tag.src = "https://www.youtube.com/iframe_api";
-const firstScriptTag = document.getElementsByTagName('script')[0];
-firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-function onYouTubeIframeAPIReady() {
-    ytPlayer = new YT.Player('yt-player', {
-        height: '1', 
-        width: '1',
-        videoId: 'FqnAV6tkwzA', 
-        playerVars: {
-            'autoplay': 0, 'controls': 0, 'loop': 1, 'playlist': 'FqnAV6tkwzA' 
-        }
-    });
-}
-
-// === NEW: Campfire (Zen) Logic & Spark Generator ===
 const exitZenBtn = document.getElementById('exit-zen-btn');
 const sparksContainer = document.getElementById('sparks-container');
-
-// Load your 30-minute campfire audio
 const campfireAudio = new Audio('sounds/campfire.mp3');
 campfireAudio.loop = true;
 
@@ -414,23 +415,12 @@ let sparkInterval;
 function createSpark() {
     const spark = document.createElement('div');
     spark.classList.add('spark');
-    
-    // Randomize where the spark starts horizontally
     spark.style.left = Math.random() * 100 + 'vw';
-    
-    // Randomize how fast it floats up (between 2 and 6 seconds)
     const duration = Math.random() * 4 + 2; 
     spark.style.animationDuration = duration + 's';
-    
-    // Randomize how much it drifts to the left or right as it rises
     spark.style.setProperty('--drift', (Math.random() * 200 - 100) + 'px');
-    
     sparksContainer.appendChild(spark);
-    
-    // Remove the spark from the code once it floats off screen
-    setTimeout(() => {
-        spark.remove();
-    }, duration * 1000);
+    setTimeout(() => { spark.remove(); }, duration * 1000);
 }
 
 function toggleZenMode() {
@@ -440,24 +430,21 @@ function toggleZenMode() {
     if (isZenMode) {
         document.body.classList.add('zen-mode');
         campfireAudio.play().catch(e => console.log("Campfire audio blocked"));
-        
-        // Start generating sparks every 150 milliseconds
         sparkInterval = setInterval(createSpark, 150);
+        
+        // Achievement Check
+        unlockAdvancement('adv-zen', 'Zen Master');
     } else {
         document.body.classList.remove('zen-mode');
         campfireAudio.pause();
-        
-        // Stop generating sparks and clear the screen
         clearInterval(sparkInterval);
         sparksContainer.innerHTML = ''; 
     }
 }
 
-// Attach the toggle to both buttons
 zenBtn.addEventListener('click', toggleZenMode);
 exitZenBtn.addEventListener('click', toggleZenMode);
 
-// Event Listeners
 searchInput.addEventListener('input', (e) => renderList(e.target.value));
 newBtn.addEventListener('click', createNewEntry);
 titleInput.addEventListener('input', triggerSave);
@@ -465,7 +452,6 @@ quill.on('text-change', triggerSave);
 exportBtn.addEventListener('click', exportData);
 importFile.addEventListener('change', importData);
 
-// === NEW: Mobile Menu Logic ===
 const mobileMenuBtn = document.getElementById('mobile-menu-btn');
 const mobileOverlay = document.getElementById('mobile-overlay');
 const sidebar = document.getElementById('sidebar');
@@ -481,5 +467,25 @@ if (mobileMenuBtn && mobileOverlay) {
     mobileOverlay.addEventListener('click', toggleMobileMenu);
 }
 
-// Start the app
+const advScreen = document.getElementById('advancements-screen');
+const closeAdvBtn = document.getElementById('close-adv-btn');
+
+function toggleAdvancements() {
+    playSound(clickSound);
+    advScreen.classList.toggle('hidden');
+}
+
+closeAdvBtn.addEventListener('click', toggleAdvancements);
+const advBtn = document.getElementById('adv-btn');
+if(advBtn) advBtn.addEventListener('click', toggleAdvancements);
+
+document.addEventListener('keydown', (e) => {
+    const target = e.target;
+    if (!target) return;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || (target.classList && target.classList.contains('ql-editor'))) return;
+    
+    if (e.key === 'l' || e.key === 'L') toggleAdvancements();
+});
+
+// Start the app!
 init();
