@@ -28,7 +28,8 @@
             <label for="import-file" class="mc-btn small-btn import-label">Import Chest (Load)</label>
             <input type="file" id="import-file" accept=".json" style="display: none;">
             <button id="zen-btn" class="mc-btn small-btn" style="margin-top: 15px;">Campfire Mode</button>
-            <button id="adv-btn" class="mc-btn small-btn" style="margin-top: 10px;">Advancements (L)</button>
+            <button id="adv-btn" class="mc-btn small-btn" style="margin-top: 10px;"> Advancements (L)</button>
+            <button id="stats-btn" class="mc-btn small-btn" style="margin-top: 10px;"> Statistics (I)</button>
         </div>
         <div id="jukebox-container">
             <div id="now-playing">Music: Paused</div>
@@ -66,40 +67,64 @@
         <div class="toast-text"><div class="toast-title">Advancement Made!</div><div id="toast-desc"></div></div>
     </div>
 
+    <div id="stats-screen" class="hidden">
+        <div id="stats-window">
+            <div id="stats-header">Player Statistics</div>
+            
+            <div id="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Total Words</div>
+                    <div class="stat-value" id="stat-words-val">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Books Written</div>
+                    <div class="stat-value" id="stat-books-val">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Current Streak</div>
+                    <div class="stat-value" id="stat-streak-val">0</div>
+                </div>
+            </div>
+
+            <div id="chart-container">
+                <canvas id="dimension-chart"></canvas>
+            </div>
+
+            <button id="close-stats-btn" class="mc-btn" style="margin-top: 15px;">Close</button>
+        </div>
+    </div>
+
     <div id="advancements-screen" class="hidden">
         <div id="adv-window">
             <div id="adv-header">Advancements</div>
             <div id="adv-list">
-                
                 <div class="adv-node locked" id="adv-authors"><img src="favicon-32x32.png" alt="Icon"><div class="adv-info"><div class="adv-title">Author's Journey</div><div class="adv-desc">Write your very first journal entry.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-10k"><img src="favicon-32x32.png" alt="Icon"><div class="adv-info"><div class="adv-title">Librarian</div><div class="adv-desc">Write a total of 10,000 words.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-streak-3"><img src="images/wood.png" alt="Icon"><div class="adv-info"><div class="adv-title">Getting Wood</div><div class="adv-desc">Reach a 3-day writing streak.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-streak-7"><img src="images/stone_pick.png" alt="Icon"><div class="adv-info"><div class="adv-title">Time to Mine!</div><div class="adv-desc">Reach a 7-day writing streak.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-streak-30"><img src="images/diamond.png" alt="Icon"><div class="adv-info"><div class="adv-title">Diamonds!</div><div class="adv-desc">Reach a 30-day writing streak.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-streak-64"><img src="images/gapple.png" alt="Icon"><div class="adv-info"><div class="adv-title">A Full Stack</div><div class="adv-desc">Reach a 64-day writing streak.</div><div class="adv-progress hidden"></div></div></div>
-
                 <div class="adv-node locked" id="adv-nether"><img src="images/NT.png" alt="Icon"><div class="adv-info"><div class="adv-title">We Need to Go Deeper</div><div class="adv-desc">Write a venting entry in the Nether.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-end"><img src="images/EN.png" alt="Icon"><div class="adv-info"><div class="adv-title">The End?</div><div class="adv-desc">Write a reflective entry in The End.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-zen"><img src="images/campfire.png" alt="Icon"><div class="adv-info"><div class="adv-title">Zen Master</div><div class="adv-desc">Enter Campfire Mode to focus.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-storage"><img src="images/chest.png" alt="Icon"><div class="adv-info"><div class="adv-title">Safe Storage</div><div class="adv-desc">Backup your chest to your computer.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-music"><img src="images/music_disc.png" alt="Icon"><div class="adv-info"><div class="adv-title">Music to my Ears</div><div class="adv-desc">Listen to the Jukebox while writing.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-delete"><img src="images/lava_bucket.png" alt="Icon"><div class="adv-info"><div class="adv-title">Playing with Fire</div><div class="adv-desc">Throw a journal entry into the lava.</div><div class="adv-progress hidden"></div></div></div>
-
                 <div class="adv-node locked" id="adv-img"><img src="images/painting.png" alt="Icon"><div class="adv-info"><div class="adv-title">Masterpiece</div><div class="adv-desc">Insert an image into your journal.</div><div class="adv-progress hidden"></div></div></div>
-                <div class="adv-node locked" id="adv-code"><img src="images/enchanting_table.png" alt="Icon"><div class="adv-info"><div class="adv-title">Enchanter</div><div class="adv-desc">Write in the Standard Galactic Alphabet.</div><div class="adv-progress hidden"></div></div></div>
-                <div class="adv-node locked" id="adv-bullet"><img src="favicon-32x32.png" alt="Icon"><div class="adv-info"><div class="adv-title">Organized Mind</div><div class="adv-desc">Create a bulleted or numbered list.</div><div class="adv-progress hidden"></div></div></div>
+                <div class="adv-node locked" id="adv-code"><img src="images/enchant_table.png" alt="Icon"><div class="adv-info"><div class="adv-title">Enchanter</div><div class="adv-desc">Write in the Standard Galactic Alphabet.</div><div class="adv-progress hidden"></div></div></div>
+                <div class="adv-node locked" id="adv-bullet"><img src="images/book_quill.png" alt="Icon"><div class="adv-info"><div class="adv-title">Organized Mind</div><div class="adv-desc">Create a bulleted or numbered list.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-color"><img src="images/dye.png" alt="Icon"><div class="adv-info"><div class="adv-title">Colorful Personality</div><div class="adv-desc">Highlight or change the color of your text.</div><div class="adv-progress hidden"></div></div></div>
-
                 <div class="adv-node locked" id="adv-night"><img src="images/bed.png" alt="Icon"><div class="adv-info"><div class="adv-title">Night Owl</div><div class="adv-desc">Write an entry between Midnight and 4AM.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-early"><img src="images/sunflower.png" alt="Icon"><div class="adv-info"><div class="adv-title">Early Bird</div><div class="adv-desc">Write an entry between 5AM and 8AM.</div><div class="adv-progress hidden"></div></div></div>
                 <div class="adv-node locked" id="adv-storm"><img src="images/water_bucket.png" alt="Icon"><div class="adv-info"><div class="adv-title">Shelter from the Storm</div><div class="adv-desc">Write in the Overworld while it's raining or snowing.</div><div class="adv-progress hidden"></div></div></div>
-
             </div>
             <button id="close-adv-btn" class="mc-btn">Close</button>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-    <script src="script.js?v=2"></script>
+    
+    <script src="script.js?v=3"></script>
 </body>
 </html>

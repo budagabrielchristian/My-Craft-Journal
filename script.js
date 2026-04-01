@@ -40,7 +40,6 @@ function playSound(sound) {
     sound.play().catch(e => console.log("Sound skipped"));
 }
 
-// === Permanent Advancements System ===
 let unlockedAdvs = JSON.parse(localStorage.getItem('mcAdvs')) || [];
 
 function unlockAdvancement(id, title) {
@@ -141,24 +140,20 @@ deleteBtn.addEventListener('click', () => {
         playSound(clickSound);
         entries = entries.filter(e => e.id !== currentId);
         localStorage.setItem('mcJournals', JSON.stringify(entries));
-        unlockAdvancement('adv-delete', 'Playing with Fire'); // Lava Bucket Adv!
+        unlockAdvancement('adv-delete', 'Playing with Fire'); 
         
         if(entries.length > 0) { loadEntry(entries[0].id); } 
         else { createNewEntry(); }
     }
 });
 
-// === Helper logic to calculate streaks for both saving and progress viewing ===
-// === FIXED STREAK LOGIC ===
 function calculateCurrentStreak() {
     if (entries.length === 0) return 0;
-    
-    // Convert all dates to standard midnight timestamps to avoid the Javascript Month Bug!
     const daysWritten = [...new Set(entries.map(e => {
         const d = new Date(e.date);
-        d.setHours(0, 0, 0, 0); // Strip away the time, keep only the day
+        d.setHours(0, 0, 0, 0); 
         return d.getTime();
-    }))].sort((a, b) => b - a); // Sort newest to oldest
+    }))].sort((a, b) => b - a); 
 
     let streak = 0;
     let checkDate = new Date();
@@ -166,19 +161,11 @@ function calculateCurrentStreak() {
 
     for (let i = 0; i < daysWritten.length; i++) {
         const checkTime = checkDate.getTime();
-        
         if (daysWritten[i] === checkTime) {
-            // They wrote today!
-            streak++;
-            checkDate.setDate(checkDate.getDate() - 1); 
+            streak++; checkDate.setDate(checkDate.getDate() - 1); 
         } else if (i === 0 && daysWritten[i] === new Date(new Date().setHours(0,0,0,0)).setDate(new Date().getDate() - 1)) {
-            // They haven't written today yet, but wrote yesterday (streak is still alive)
-            streak++;
-            checkDate.setDate(checkDate.getDate() - 2); 
-        } else {
-            // Streak broken
-            break; 
-        }
+            streak++; checkDate.setDate(checkDate.getDate() - 2); 
+        } else { break; }
     }
     return streak;
 }
@@ -197,7 +184,6 @@ function triggerSave() {
             renderList(searchInput.value); 
         }
 
-        // --- Core Stats ---
         let totalWordsAllBooks = 0;
         entries.forEach(e => {
             const textOnly = (e.content || "").replace(/<[^>]*>?/gm, '');
@@ -209,7 +195,6 @@ function triggerSave() {
         xpLevel.innerText = currentWordCount; 
         xpFill.style.width = `${(currentWordCount % 50) / 50 * 100}%`;
         
-        // --- Advancement Checks ---
         if(totalWordsAllBooks >= 10000) unlockAdvancement('adv-10k', 'Librarian');
         
         const streak = calculateCurrentStreak();
@@ -218,19 +203,16 @@ function triggerSave() {
         if(streak >= 30) unlockAdvancement('adv-streak-30', 'Diamonds!');
         if(streak >= 64) unlockAdvancement('adv-streak-64', 'A Full Stack');
 
-        // Editor Formatting Detectors
         const html = quill.root.innerHTML;
         if (html.includes('<img')) unlockAdvancement('adv-img', 'Masterpiece');
         if (html.includes('SGA') || html.includes('ql-code-block-container')) unlockAdvancement('adv-code', 'Enchanter');
         if (html.includes('<li>')) unlockAdvancement('adv-bullet', 'Organized Mind');
         if (html.includes('color:') || html.includes('background-color:')) unlockAdvancement('adv-color', 'Colorful Personality');
 
-        // Time Checkers
         const hour = new Date().getHours();
         if (hour >= 0 && hour < 4) unlockAdvancement('adv-night', 'Night Owl');
         if (hour >= 5 && hour < 8) unlockAdvancement('adv-early', 'Early Bird');
         
-        // Weather Checker
         if (document.body.classList.contains('weather-rain') || document.body.classList.contains('weather-snow')) {
             if(document.querySelector('.dim-btn.active').dataset.dim === 'overworld') {
                 unlockAdvancement('adv-storm', 'Shelter from the Storm');
@@ -361,7 +343,7 @@ playPauseBtn.addEventListener('click', () => {
         currentMusic.play().catch(e => console.log("Music play blocked"));
         if (document.body.classList.contains('weather-rain')) rainAudio.play();
         nowPlayingText.innerText = `Playing: ${activeDim.charAt(0).toUpperCase() + activeDim.slice(1)}`;
-        unlockAdvancement('adv-music', 'Music to my Ears'); // Music Adv!
+        unlockAdvancement('adv-music', 'Music to my Ears');
     } else {
         playPauseBtn.innerText = "🎵 Play Music";
         currentMusic.pause();
@@ -447,43 +429,91 @@ if (mobileMenuBtn && mobileOverlay) {
 
 const advScreen = document.getElementById('advancements-screen');
 const closeAdvBtn = document.getElementById('close-adv-btn');
-
-function toggleAdvancements() {
-    playSound(clickSound);
-    advScreen.classList.toggle('hidden');
-}
-
+function toggleAdvancements() { playSound(clickSound); advScreen.classList.toggle('hidden'); }
 closeAdvBtn.addEventListener('click', toggleAdvancements);
 const advBtn = document.getElementById('adv-btn');
 if(advBtn) advBtn.addEventListener('click', toggleAdvancements);
+
+// === NEW: Statistics Menu Logic ===
+const statsScreen = document.getElementById('stats-screen');
+const closeStatsBtn = document.getElementById('close-stats-btn');
+const statsBtn = document.getElementById('stats-btn');
+let myChart = null; // Holds our Chart.js instance
+
+function toggleStats() {
+    playSound(clickSound);
+    statsScreen.classList.toggle('hidden');
+    
+    // Only calculate and draw if we are opening it
+    if (!statsScreen.classList.contains('hidden')) {
+        let totalWords = 0;
+        let dimCounts = { overworld: 0, nether: 0, end: 0 };
+        
+        entries.forEach(e => {
+            const textOnly = (e.content || "").replace(/<[^>]*>?/gm, '');
+            totalWords += textOnly.trim().length > 0 ? textOnly.trim().split(/\s+/).length : 0;
+            
+            if (e.dimension === 'nether') dimCounts.nether++;
+            else if (e.dimension === 'end') dimCounts.end++;
+            else dimCounts.overworld++;
+        });
+
+        document.getElementById('stat-words-val').innerText = totalWords;
+        document.getElementById('stat-books-val').innerText = entries.length;
+        document.getElementById('stat-streak-val').innerText = calculateCurrentStreak();
+
+        // Destroy the old chart if it exists so it doesn't glitch when you hover over it
+        if (myChart) { myChart.destroy(); }
+
+        const ctx = document.getElementById('dimension-chart').getContext('2d');
+        myChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Overworld', 'The Nether', 'The End'],
+                datasets: [{
+                    data: [dimCounts.overworld, dimCounts.nether, dimCounts.end],
+                    backgroundColor: ['#55ff55', '#ff5555', '#aa00aa'],
+                    borderColor: '#373737',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { color: '#ffffff', font: { family: "'Pixelify Sans', sans-serif", size: 14 } }
+                    }
+                }
+            }
+        });
+    }
+}
+
+closeStatsBtn.addEventListener('click', toggleStats);
+if(statsBtn) statsBtn.addEventListener('click', toggleStats);
 
 document.addEventListener('keydown', (e) => {
     const target = e.target;
     if (!target) return;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || (target.classList && target.classList.contains('ql-editor'))) return;
+    
     if (e.key === 'l' || e.key === 'L') toggleAdvancements();
+    // NEW: Hotkey 'I' for Stats (Inventory)
+    if (e.key === 'i' || e.key === 'I') toggleStats(); 
 });
 
-// === NEW: Clickable Progress Tracker ===
 document.querySelectorAll('.adv-node').forEach(node => {
     node.addEventListener('click', () => {
         playSound(clickSound);
         const progressDiv = node.querySelector('.adv-progress');
         const id = node.id;
-        
-        // Hide all other open progress bars first for cleanliness
         document.querySelectorAll('.adv-progress').forEach(p => p.classList.add('hidden'));
-        
-        // Show this specific progress bar
         progressDiv.classList.remove('hidden');
         
-        // If it's already unlocked, just show "Completed"
-        if (unlockedAdvs.includes(id)) {
-            progressDiv.innerText = "Status: Completed!";
-            return;
-        }
+        if (unlockedAdvs.includes(id)) { progressDiv.innerText = "Status: Completed!"; return; }
 
-        // Calculate progress based on the specific ID
         let streak = calculateCurrentStreak();
         let totalWordsAllBooks = 0;
         entries.forEach(e => {
